@@ -1,6 +1,25 @@
-<div id="gameContainer">
-    <canvas id="gameCanvas"></canvas>
-    <div id="ui">
-        <div>高度: <span id="score">0</span>m</div>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>巨人を登れ！ Giant Climber</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="gameContainer">
+        <div id="canvasWrapper">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+        
+        <div id="uiLayer">
+            <div id="ui">
+                <div>高度: <span id="score">0</span>m</div>
+            </div>
+        </div>
     </div>
-</div>
+
+    <script src="main.js"></script>
+</body>
+</html>
