@@ -1,11 +1,30 @@
 // --- 設定、状態、アセット管理は以前のものを維持 ---
+// --- 設定 ---
 const SETTINGS = {
-    giantImageSrc: 'giant.png', maskImageSrc: 'giant_mask.png',
-    faceImageSrc: 'face.png', arrowImageSrc: 'arrow.png',
-    playerIdleSrc: 'player_idle.png', playerSlideSrc: 'player_slide.png',
-    playerJumpSrc: 'player_jump.png', playerFallSrc: 'player_fall.png',
-    scaleFactor: 3, climbSpeed: 250, slideSpeed: 0.8, fallSpeed: 15,
-    ease: 0.1, arrowRange: Math.PI * 0.8, arrowRotationSpeed: 0.05
+    // 画像ソースを変更
+    giantSkinSrc: 'giant_skin.png',       // 素肌
+    giantClothesSrc: 'giant_clothes.png', // 衣服（透過あり）
+    maskImageSrc: 'giant_mask.png',       // 当たり判定用（そのまま）
+    
+    // その他のアセットは維持
+    faceImageSrc: 'face.png',
+    arrowImageSrc: 'arrow.png',
+    playerIdleSrc: 'player_idle.png',
+    playerSlideSrc: 'player_slide.png',
+    playerJumpSrc: 'player_jump.png',
+    playerFallSrc: 'player_fall.png',
+    
+    // ゲームパラメータ
+    scaleFactor: 3,
+    climbSpeed: 250,
+    slideSpeed: 0.8,
+    fallSpeed: 15,
+    ease: 0.1,
+    arrowRange: Math.PI * 0.8,
+    arrowRotationSpeed: 0.05,
+    
+    // ★追加：服が透ける円の半径（VIRTUAL_WIDTH基準）
+    revealRadius: 60 
 };
 
 const VIRTUAL_WIDTH = 360;
@@ -26,10 +45,15 @@ let gameState = {
 
 const assets = {};
 const assetSources = {
-    giant: SETTINGS.giantImageSrc, mask: SETTINGS.maskImageSrc,
-    face: SETTINGS.faceImageSrc, arrow: SETTINGS.arrowImageSrc,
-    pIdle: SETTINGS.playerIdleSrc, pSlide: SETTINGS.playerSlideSrc,
-    pJump: SETTINGS.playerJumpSrc, pFall: SETTINGS.playerFallSrc
+    giantSkin: SETTINGS.giantSkinSrc,       // 名前変更
+    giantClothes: SETTINGS.giantClothesSrc, // 追加
+    mask: SETTINGS.maskImageSrc,
+    face: SETTINGS.faceImageSrc,
+    arrow: SETTINGS.arrowImageSrc,
+    pIdle: SETTINGS.playerIdleSrc,
+    pSlide: SETTINGS.playerSlideSrc,
+    pJump: SETTINGS.playerJumpSrc,
+    pFall: SETTINGS.playerFallSrc
 };
 
 // --- 関数定義 ---
@@ -45,7 +69,7 @@ function initCanvas() {
 }
 
 function resetGame() {
-    const imgRatio = assets.giant.width / assets.giant.height;
+    const imgRatio = assets.giantSkin.width / assets.giantSkin.height;
     const drawW = VIRTUAL_WIDTH * SETTINGS.scaleFactor;
     const drawH = drawW / imgRatio;
     gameState.playerScreenX = VIRTUAL_WIDTH / 2;
@@ -65,21 +89,28 @@ function updateMessage(score) {
 
 function draw() {
     ctx.clearRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
-    const imgRatio = assets.giant.width / assets.giant.height;
+
+    const imgRatio = assets.giantSkin.width / assets.giantSkin.height; // giantSkin基準
     const drawW = VIRTUAL_WIDTH * SETTINGS.scaleFactor;
     const drawH = drawW / imgRatio;
 
-    // 1. 背景
-    ctx.drawImage(assets.giant, -gameState.mapX, -gameState.mapY, drawW, drawH);
+    // ---------------------------------------------------------
+    // レイヤー1：巨人の素肌（最奥）
+    // ---------------------------------------------------------
+    ctx.drawImage(assets.giantSkin, -gameState.mapX, -gameState.mapY, drawW, drawH);
 
-    // 2. 矢印 (キャラクターの奥)
+    // ---------------------------------------------------------
+    // レイヤー2：矢印 (キャラクターの奥)
+    // ---------------------------------------------------------
     ctx.save();
     ctx.translate(gameState.playerScreenX, gameState.playerScreenY - 40);
     ctx.rotate(-gameState.arrowAngle + Math.PI/2);
     ctx.drawImage(assets.arrow, -30, -100, 60, 100);
     ctx.restore();
 
-    // 3. プレイヤー (ジャンプ中は反時計回りに高速回転)
+    // ---------------------------------------------------------
+    // レイヤー3：プレイヤー
+    // ---------------------------------------------------------
     let playerImg = assets.pIdle;
     if (gameState.isJumping) playerImg = assets.pJump;
     else if (!gameState.isGrounded) playerImg = gameState.isOnGiant ? assets.pSlide : assets.pFall;
@@ -94,39 +125,50 @@ function draw() {
     ctx.drawImage(playerImg, -pSize/2, -pSize/2, pSize, pSize);
     ctx.restore();
 
-    // 4. メッセージボックス一式の描画 (最前面に一括管理)
+    // ---------------------------------------------------------
+    // レイヤー4：巨人の衣服（最前面） ＋ ★マスク処理
+    // ---------------------------------------------------------
+    ctx.save(); // 服描画レイヤー用の状態保存
+
+    // ★重要：クリッピング（切り抜き）パスを作成
+    ctx.beginPath();
+    // 画面全体を覆う四角形を描画
+    ctx.rect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+    
+    // 主人公を中心とした円を描画。
+    // 最後の引数 'true' は反時計回りを意味し、これが「外側の四角形」と組み合わさることで、
+    // 円の部分だけを「くり抜く（パスから除外する）」効果を生みます。
+    ctx.arc(gameState.playerScreenX, gameState.playerScreenY - pSize/2, SETTINGS.revealRadius, 0, Math.PI * 2, true);
+    
+    // これをクリッピングパスとして設定。以降の描画はこのパスの中（くり抜かれた円の外）だけに限定される。
+    ctx.clip(); 
+
+    // 服を描画。円の部分だけが自動的に描画されないため、「服が透けて下の肌とキャラが見える」状態になる。
+    ctx.drawImage(assets.giantClothes, -gameState.mapX, -gameState.mapY, drawW, drawH);
+
+    ctx.restore(); // クリッピング状態を解除（これをしないとメッセージボックスもくり抜かれる）
+
+    // ---------------------------------------------------------
+    // レイヤー5：メッセージボックス（Canvas統一版のもの）
+    // ---------------------------------------------------------
+    // ...（以前のメッセージボックス描画コードをここに記述。顔画像、テキスト含む）...
+    
+    // 参考（以前のコード）：
     const boxH = 120;
     const boxY = VIRTUAL_HEIGHT - boxH - 20;
     const boxX = 20;
     const boxW = VIRTUAL_WIDTH - 40;
-
-    // 半透明の背景
     ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-    ctx.beginPath();
-    ctx.roundRect(boxX, boxY, boxW, boxH, 15);
-    ctx.fill();
-    // 枠線
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // 顔画像 (ボックスの左端からはみ出すように配置)
-    const faceSize = 130;
-    ctx.drawImage(assets.face, boxX - 10, boxY - 20, faceSize, faceSize);
-
-    // テキスト (顔画像と被らない位置から開始)
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 18px sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    // テキストを折り返し表示（簡易版）
-    const textX = boxX + 110;
-    ctx.fillText(gameState.currentMsg, textX, boxY + boxH/2, boxW - 130);
+    ctx.beginPath(); ctx.roundRect(boxX, boxY, boxW, boxH, 15); ctx.fill();
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.drawImage(assets.face, boxX - 10, boxY - 20, 130, 130);
+    ctx.fillStyle = "#fff"; ctx.font = "bold 18px sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    const textX = boxX + 110; ctx.fillText(gameState.currentMsg, textX, boxY + boxH/2, boxW - 130);
 }
 
 // 共通のupdate、gameLoop、handleInputなどはそのまま継続
 function update() {
-    const imgRatio = assets.giant.width / assets.giant.height;
+    const imgRatio = assets.giantSkin.width / assets.giantSkin.height;
     const drawW = VIRTUAL_WIDTH * SETTINGS.scaleFactor;
     const drawH = drawW / imgRatio;
 
