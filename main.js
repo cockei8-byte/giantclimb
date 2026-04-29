@@ -404,6 +404,19 @@ function getTerrainAt(tx, ty, ox = 0, oy = 0) {
 }
 
 function checkCircleTerrain(tx, ty) {
+    // --- 追加：画面上端より上のエリアへの特別処理 ---
+    const drawW = VIRTUAL_WIDTH * SETTINGS.scaleFactor;
+    const imgRatio = assets.giantSkin.width / assets.giantSkin.height;
+    const drawH = drawW / imgRatio;
+    const topThreshold = -gameState.playerScreenY; // 画像の最上部座標
+
+    // プレイヤーの判定位置（ty）が画像の上端を越えていたら、
+    // 他の判定を無視して強制的にLIME（ゴール）を返す
+    if (ty < topThreshold) {
+        return { type: TERRAIN.VOID, colorKey: 'LIME' };
+    }
+    // --------------------------------------------
+
     const radius = SETTINGS.hitRadius;
     const points = [{x: 0, y: 0}, {x: 0, y: -radius}, {x: 0, y: radius}, {x: -radius, y: 0}, {x: radius, y: 0}];
     let bestMatch = { type: TERRAIN.VOID, colorKey: 'VOID' };
