@@ -745,13 +745,25 @@ function initGame() {
 
 let loadedCount = 0;
 const totalAssets = Object.keys(assetSources).length;
+const progressBar = document.getElementById('progressBar'); // ゲージ要素を取得
 
 for (let key in assetSources) {
     assets[key] = new Image();
     assets[key].onload = () => {
         loadedCount++;
+
+        // --- ゲージの更新処理 ---
+        const progress = (loadedCount / totalAssets) * 100;
+        if (progressBar) {
+            progressBar.style.width = progress + '%';
+        }
+        // -----------------------
+
         if (loadedCount === totalAssets) {
+            // 全て読み込んだらゲージとメッセージを隠し、スタートを表示
             document.getElementById('loadingMessage').style.display = 'none';
+            document.getElementById('progressContainer').style.display = 'none'; // コンテナごと隠す
+            
             const clickEl = document.getElementById('clickToStart');
             clickEl.style.display = 'block';
 
