@@ -94,7 +94,6 @@ const COLOR_THEMES = {
 
 let lastColorKey = 'VOID';
 
-// --- 表情ごとの呼吸設定 ---
 const FACE_BREATH_CONFIG = {
     GEKIDO:  { speed: 0.10, amount: 0.010 },
     IKARI:   { speed: 0.06, amount: 0.010 },
@@ -108,7 +107,6 @@ const FACE_BREATH_CONFIG = {
     TERE:    { speed: 0.04, amount: 0.010 }  
 };
 
-// --- メッセージデータ ---
 const FIXED_MESSAGES = [
     { JP: " ", EN: " ", face: "NIYA" },
     { JP: "人間のてめぇが\n巨人の俺様に\n挑もうって？", EN: "A tiny human like you\ndares to challenge\na giant like me?", face: "OI" },
@@ -261,12 +259,12 @@ let gameState = {
     playerAnimTimer: 0,
     endingMessageIndex: 0,
     fadeTimer: 0,
-    fadePhase: 'NONE',
+    fadePhase: 'NONE', // 'NONE', 'OUT', 'IN'
     pendingEndingKey: null,
     pendingColorKey: 'VOID'
 };
 
-const FADE_SPEED = 0.02;
+const FADE_SPEED = 0.05;
 let messageIndices = { BLACK: 0, GREEN: 0, YELLOW: 0, PURPLE: 0, CYAN: 0, ORANGE: 0, PINK: 0, BROWN: 0, MAROON: 0, VOID: 0, MAGENTA: 0, LIME: 0 };
 
 const VIRTUAL_WIDTH = 360;
@@ -286,7 +284,7 @@ let typeWriter = {
 
 const assets = {};
 const assetSources = {
-    titleLogoImg: 'title.png', // タイトルロゴ画像を追加
+    titleLogoImg: 'title.png',
     background: SETTINGS.backgroundImageSrc,
     giantSkin: SETTINGS.giantSkinSrc,
     giantClothes: SETTINGS.giantClothesSrc,
@@ -382,9 +380,7 @@ function getTerrainAt(tx, ty, ox = 0, oy = 0) {
     const scale = assets.mask.width / drawW;
     const checkX = Math.floor((tx + gameState.playerScreenX + ox) * scale);
     const checkY = Math.floor((ty + gameState.playerScreenY + oy) * scale);
-    
     if (checkX < 0 || checkX >= assets.mask.width || checkY < 0 || checkY >= assets.mask.height) return { type: TERRAIN.VOID, colorKey: 'VOID' };
-    
     const pixel = maskCtx.getImageData(checkX, checkY, 1, 1).data;
     const r = pixel[0], g = pixel[1], b = pixel[2];
     const check = (targetR, targetG, targetB) => Math.abs(r - targetR) <= 10 && Math.abs(g - targetG) <= 10 && Math.abs(b - targetB) <= 10;
@@ -422,6 +418,30 @@ function checkCircleTerrain(tx, ty) {
 
 function update() {
     if (!gameStarted) return;
+
+    // --- フェード処理の更新 ---
+    if (gameState.fadePhase === 'OUT') {
+        gameState.fadeTimer += FADE_SPEED;
+        if (gameState.fadeTimer >= 1.0) {
+            gameState.fadeTimer = 1.0;
+            // 真っ暗になった瞬間にゲーム状態を切り替える
+            gameState.isGameOver = true;
+            gameState.currentEndingKey = gameState.pendingEndingKey;
+            gameState.endingMessageIndex = 0;
+            const endMsgs = ENDING_MESSAGES[gameState.currentEndingKey];
+            if (endMsgs && endMsgs[0]) startMessage(endMsgs[0], gameState.pendingColorKey);
+            
+            gameState.fadePhase = 'IN';
+        }
+        // OUT中は他のゲーム進行を止める
+        return; 
+    } else if (gameState.fadePhase === 'IN') {
+        gameState.fadeTimer -= FADE_SPEED;
+        if (gameState.fadeTimer <= 0) {
+            gameState.fadeTimer = 0;
+            gameState.fadePhase = 'NONE';
+        }
+    }
 
     if (gameState.isGameOver) {
         updateTyping();
@@ -465,11 +485,13 @@ function update() {
                     messageIndices[key] = 1;
                     gameState.messageReserved = true;
                 } else if (config.endTo) {
-                    gameState.isGameOver = true;
-                    gameState.currentEndingKey = config.endTo;
-                    gameState.endingMessageIndex = 0;
-                    const endMsgs = ENDING_MESSAGES[config.endTo];
-                    if (endMsgs && endMsgs[0]) startMessage(endMsgs[0], key);
+                    // フェードアウト開始
+                    if (gameState.fadePhase === 'NONE') {
+                        gameState.fadePhase = 'OUT';
+                        gameState.fadeTimer = 0;
+                        gameState.pendingEndingKey = config.endTo;
+                        gameState.pendingColorKey = key;
+                    }
                 }
             }
         }
@@ -630,11 +652,21 @@ function draw() {
         ctx.shadowColor = "#FFFFFF"; ctx.shadowBlur = 0; ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
         ctx.fillText(line, 0, 0); ctx.restore();
     });
+
+    // --- フェードの描画 (draw関数の最後) ---
+    if (gameState.fadePhase !== 'NONE' || gameState.fadeTimer > 0) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = `rgba(0, 0, 0, ${gameState.fadeTimer})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+    }
 }
 
 function handleInput(e) {
     if (e.type === 'touchstart') e.preventDefault();
     if (!gameStarted) return;
+    if (gameState.fadePhase === 'OUT') return; // 暗転中は入力を受け付けない
 
     if (gameState.isGameOver) {
         if (typeWriter.index < typeWriter.fullText.length) {
@@ -648,7 +680,7 @@ function handleInput(e) {
             if (gameState.endingMessageIndex < currentEndMsgs.length) {
                 const nextMsg = currentEndMsgs[gameState.endingMessageIndex];
                 const savedColor = typeWriter.color; 
-                startMessage(nextMsg);
+                startMessage(nextMsg, gameState.pendingColorKey || 'VOID');
                 typeWriter.color = savedColor;
             }
         }
