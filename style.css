@@ -2,6 +2,8 @@ body {
     margin: 0; padding: 0; background-color: #1a1a1a;
     display: flex; justify-content: center; align-items: center;
     height: 100vh; width: 100vw; overflow: hidden;
+
+    
 }
 
 #gameContainer {
@@ -18,4 +20,10 @@ canvas { width: 100%; height: 100%; display: block; }
     color: #00ffcc; font-family: sans-serif; font-weight: bold;
     background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 5px;
     pointer-events: none;
+}
+
+canvas, #startScreen {
+    touch-action: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent; /* タップ時の青い枠を消す */
 }
