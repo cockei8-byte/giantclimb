@@ -537,7 +537,7 @@ function update() {
         if (gameState.vy > 0) { gameState.vy = 0; gameState.vx = 0; gameState.isFlying = false; }
     }
     gameState.mapX = Math.max(0, Math.min(drawW - VIRTUAL_WIDTH, gameState.mapX));
-    gameState.mapY = Math.max(-gameState.playerScreenY + SETTINGS.hitRadius, Math.min(maxY, gameState.mapY));
+    gameState.mapY = Math.min(maxY, gameState.mapY);
 
     const final = checkCircleTerrain(gameState.mapX, gameState.mapY);
     if (final.type === TERRAIN.SKIN && (gameState.isFlying || speed > SETTINGS.stopThreshold)) {
